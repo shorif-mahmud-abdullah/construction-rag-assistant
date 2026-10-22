@@ -1,13 +1,29 @@
 # Construction RAG Assistant
 
+[![CI](https://github.com/shorif-mahmud-abdullah/construction-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/shorif-mahmud-abdullah/construction-rag-assistant/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![Ollama](https://img.shields.io/badge/LLM-Ollama%20(local)-black)
+
 A Retrieval-Augmented Generation (RAG) system for construction engineering documentation. Ask questions about construction safety, materials, project management, and more - get answers grounded in your documents.
 
 ## Architecture
 
-```
-documents/*.pdf → PDF Loader → Text Chunker → Embeddings → ChromaDB
-                                                              ↓
-Question → Embedding → Similarity Search → Context + LLM (Ollama) → Answer
+```mermaid
+flowchart TD
+    subgraph IDX[Indexing - first run only]
+        P[documents/*.pdf] --> L[PDF Loader<br/>pypdf]
+        L --> K[Text Chunker<br/>500 chars, 100 overlap]
+        K --> E[Embeddings<br/>all-MiniLM-L6-v2]
+        E --> V[(ChromaDB)]
+    end
+    subgraph QRY[Answering a question]
+        Q[User question] --> QE[Embed question]
+        QE --> S[Top 3 similar chunks]
+        S --> X[Prompt: context + sources + question]
+        X --> O[Ollama LLM<br/>qwen2.5:1.5b]
+        O --> A[Answer citing the source documents]
+    end
+    V --> S
 ```
 
 **Components:**
@@ -131,6 +147,15 @@ The `documents/` folder includes 5 construction engineering PDFs:
    - Context is constructed with source citations
    - LLM generates answer using only the provided context
 
+## Tests
+
+```bash
+pip install pypdf chromadb numpy requests python-dotenv pytest
+python -m pytest -q
+```
+
+The suite covers chunking, PDF text extraction, the vector store, the RAG prompt and the Ollama client. The embedding model is stubbed, so tests run in about a second without downloading models or running Ollama. GitHub Actions runs them on every push.
+
 ## Troubleshooting
 
 **Model download slow?** Set a Hugging Face token for faster downloads:
@@ -143,6 +168,8 @@ export HF_TOKEN=your_token  # Linux/Mac
 ```bash
 ollama serve
 ```
+
+**Indexed before the chunk-id fix (October 2026)?** Earlier versions gave every document the same chunk ids, so later PDFs overwrote earlier ones and only part of the knowledge base was searchable. Delete `chroma_db/` once and re-run to index all documents correctly.
 
 **Reset database?** Delete the `chroma_db/` folder to re-index documents:
 ```bash
