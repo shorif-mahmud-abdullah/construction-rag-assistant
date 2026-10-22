@@ -18,7 +18,7 @@ class ChromaStore:
         ):
         self.collection.add(
             ids=[
-                str(i)
+                f"{source}:{i}"
                 for i in range(len(chunks))
             ],
             documents=chunks,
